@@ -23,7 +23,7 @@ type (
 		// DefineModule by setting all public properties to the goja.Object.
 		//
 		// The runtime is passed to avoid having to export it directly form the Engine.
-		DefineModule(*goja.Object, *goja.Runtime, *E) error
+		DefineModule(*goja.Object, *goja.Runtime) error
 	}
 )
 
@@ -51,7 +51,7 @@ func (r *rootRequire) registerBuiltin(name string, definer moduleDefiner) error 
 	df := &moduleDef{
 		exports: exports,
 	}
-	err := definer.DefineModule(exports, r.e.runtime, r.e)
+	err := definer.DefineModule(exports, r.e.runtime)
 	if err != nil {
 		return err
 	}

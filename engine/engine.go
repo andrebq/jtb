@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"strconv"
 
+	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
+	"github.com/andrebq/jtb/internal/modules/stdio"
 	"github.com/dop251/goja"
 	"github.com/rs/zerolog"
 )
@@ -60,6 +62,12 @@ func New() (*E, error) {
 	}
 	rr := &rootRequire{e: e}
 	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
+	rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
+	rr.registerBuiltin("@stdio", &stdio.Module{
+		Stdout: func() io.Writer { return e.stdout },
+		Stderr: func() io.Writer { return e.stderr },
+		Stdin:  func() io.Reader { return e.stdin },
+	})
 	err = e.registerGlobal("require", rr)
 	return e, nil
 }
@@ -139,7 +147,7 @@ func (e *E) freeze(gojaValue goja.Value) (goja.Value, error) {
 	}
 	obj, err := callable(e.runtime.GlobalObject(), gojaValue)
 	if err != nil {
-		panic("All bets are off and there is something really really weird with Object.freez or function evaluation! It is not safe to proceed!")
+		panic("All bets are off and there is something really really weird with Object.freeze or function evaluation! It is not safe to proceed!")
 	}
 	return obj, nil
 }
