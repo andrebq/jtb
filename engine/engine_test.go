@@ -27,3 +27,19 @@ func TestBasicRuntime(t *testing.T) {
 
 	_ = e
 }
+
+func TestBasicRequire(t *testing.T) {
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	_, err = e.InteractiveEval(`
+		let jtb = require("@jtb");
+		console.info("Version: ", jtb.version);
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -17,7 +17,7 @@ type (
 	}
 )
 
-func (c *console) ToObject() goja.Value {
+func (c *console) ToValue() goja.Value {
 	obj := c.e.runtime.NewObject()
 
 	obj.Set("info", c.info)

@@ -10,6 +10,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const (
+	jtbVersion = "--bleeding-edge--"
+)
+
 type (
 	// E contains the engine used to run all javascript code
 	E struct {
@@ -27,8 +31,8 @@ type (
 
 	noInput struct{}
 
-	toObject interface {
-		ToObject() goja.Value
+	toValue interface {
+		ToValue() goja.Value
 	}
 )
 
@@ -54,6 +58,9 @@ func New() (*E, error) {
 	if err != nil {
 		return nil, err
 	}
+	rr := &rootRequire{e: e}
+	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
+	err = e.registerGlobal("require", rr)
 	return e, nil
 }
 
@@ -64,26 +71,15 @@ func (e *E) protectGlobals() error {
 	Object.freeze(String);
 	Object.freeze(Number);
 	Object.freeze(Date);
+	Object.freeze(Function);
 	`)
 	return err
 }
 
-func (e *E) registerGlobal(name string, value toObject) error {
-	gojaValue := value.ToObject()
-	fn, err := e.runtime.RunScript("__goja__register_global.js", `(function(obj){
-		Object.freeze(obj);
-		return obj;
-	})`)
+func (e *E) registerGlobal(name string, value toValue) error {
+	obj, err := e.freeze(value.ToValue())
 	if err != nil {
 		return err
-	}
-	callable, ok := goja.AssertFunction(fn)
-	if !ok {
-		panic("All bets are off and there is something reall really weird with goja! It is not safe to proceed!")
-	}
-	obj, err := callable(e.runtime.GlobalObject(), gojaValue)
-	if err != nil {
-		panic("All bets are off and there is something really really weird with Object.freez or function evaluation! It is not safe to proceed!")
 	}
 	return e.runtime.GlobalObject().Set(name, obj)
 }
@@ -127,4 +123,23 @@ func (e *E) logError(tag string, err error) string {
 	e.errCount++
 	e.logger.Error().Err(err).Str("tag", tag).Int64("errCount", e.errCount).Send()
 	return strconv.FormatInt(e.errCount, 16)
+}
+
+func (e *E) freeze(gojaValue goja.Value) (goja.Value, error) {
+	fn, err := e.runtime.RunScript("__goja__freeze.js", `(function(obj){
+		Object.freeze(obj);
+		return obj;
+	})`)
+	if err != nil {
+		return nil, err
+	}
+	callable, ok := goja.AssertFunction(fn)
+	if !ok {
+		panic("All bets are off and there is something reall really weird with goja! It is not safe to proceed!")
+	}
+	obj, err := callable(e.runtime.GlobalObject(), gojaValue)
+	if err != nil {
+		panic("All bets are off and there is something really really weird with Object.freez or function evaluation! It is not safe to proceed!")
+	}
+	return obj, nil
 }
