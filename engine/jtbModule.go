@@ -13,7 +13,7 @@ type (
 // that might be required.
 //
 // As well as access to the runtime engine
-func (j *jtbModule) DefineModule(exports *goja.Object, runtime *goja.Runtime, e *E) error {
+func (j *jtbModule) DefineModule(exports *goja.Object, runtime *goja.Runtime) error {
 	exports.Set("version", j.version)
 	return nil
 }
