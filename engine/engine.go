@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
+	"github.com/andrebq/jtb/internal/modules/rawexec"
 	"github.com/andrebq/jtb/internal/modules/stdio"
 	"github.com/dop251/goja"
 	"github.com/rs/zerolog"
@@ -29,6 +30,8 @@ type (
 		errCount        int64
 
 		logger zerolog.Logger
+
+		require *rootRequire
 	}
 
 	noInput struct{}
@@ -61,6 +64,7 @@ func New() (*E, error) {
 		return nil, err
 	}
 	rr := &rootRequire{e: e}
+	e.require = rr
 	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
 	rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
 	rr.registerBuiltin("@stdio", &stdio.Module{
@@ -68,28 +72,22 @@ func New() (*E, error) {
 		Stderr: func() io.Writer { return e.stderr },
 		Stdin:  func() io.Reader { return e.stdin },
 	})
+	rr.registerBuiltin("@rawexec", &rawexec.Module{
+		Logger: e.logger.With().Str("module", "@rawexec").Logger(),
+	})
+	rr.markAsDangerous("@rawexec")
+	rr.markAsRestricted("@rawexec", true)
 	err = e.registerGlobal("require", rr)
 	return e, nil
 }
 
-func (e *E) protectGlobals() error {
-	_, err := e.runtime.RunScript("__goja__boot.js", `
-	Object.freeze(Object);
-	Object.freeze(Array);
-	Object.freeze(String);
-	Object.freeze(Number);
-	Object.freeze(Date);
-	Object.freeze(Function);
-	`)
-	return err
-}
-
-func (e *E) registerGlobal(name string, value toValue) error {
-	obj, err := e.freeze(value.ToValue())
-	if err != nil {
-		return err
-	}
-	return e.runtime.GlobalObject().Set(name, obj)
+// Unrestrict the given module and allows access to it from local sources or
+// other trusted sources.
+//
+// Untrusted source are not affected and will never be able to access restricted
+// modules.
+func (e *E) Unrestrict(name string) {
+	e.require.markAsRestricted(name, false)
 }
 
 func (e *E) InteractiveEval(code string) (interface{}, error) {
@@ -150,4 +148,24 @@ func (e *E) freeze(gojaValue goja.Value) (goja.Value, error) {
 		panic("All bets are off and there is something really really weird with Object.freeze or function evaluation! It is not safe to proceed!")
 	}
 	return obj, nil
+}
+
+func (e *E) protectGlobals() error {
+	_, err := e.runtime.RunScript("__goja__boot.js", `
+	Object.freeze(Object);
+	Object.freeze(Array);
+	Object.freeze(String);
+	Object.freeze(Number);
+	Object.freeze(Date);
+	Object.freeze(Function);
+	`)
+	return err
+}
+
+func (e *E) registerGlobal(name string, value toValue) error {
+	obj, err := e.freeze(value.ToValue())
+	if err != nil {
+		return err
+	}
+	return e.runtime.GlobalObject().Set(name, obj)
 }
