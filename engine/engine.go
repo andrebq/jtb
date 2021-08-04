@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 
 	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
@@ -63,7 +64,11 @@ func New() (*E, error) {
 	if err != nil {
 		return nil, err
 	}
-	rr := &rootRequire{e: e}
+	base, err := filepath.Abs(".")
+	if err != nil {
+		return nil, err
+	}
+	rr := &rootRequire{e: e, anchor: base}
 	e.require = rr
 	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
 	rr.registerBuiltin("@encoding/utf8", &utf8.Module{})

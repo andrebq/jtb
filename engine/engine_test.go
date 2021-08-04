@@ -72,3 +72,18 @@ func TestModuleIsNotRestricted(t *testing.T) {
 		t.Fatalf("After removing restriction, module should be loadable! But got %v", err)
 	}
 }
+
+func TestCanRequireLocalFiles(t *testing.T) {
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	_, err = e.InteractiveEval(`
+		let mymod = require("./mymod.js");
+	`)
+	if err != nil {
+		t.Fatalf("Should load mymod.js without any problems, but got %v", err)
+	}
+}
