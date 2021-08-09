@@ -15,6 +15,8 @@ type (
 	rootRequire struct {
 		e *E
 
+		initDone bool
+
 		anchor string
 
 		builtins map[string]*moduleDef
@@ -100,9 +102,7 @@ func (r *rootRequire) markAsRestricted(name string, restricted bool) {
 }
 
 func (r *rootRequire) registerBuiltin(name string, definer moduleDefiner) error {
-	if r.builtins == nil {
-		r.builtins = make(map[string]*moduleDef)
-	}
+	r.init()
 	if r.builtins[name] != nil {
 		return errors.New("module is already defined!")
 	}
@@ -140,16 +140,17 @@ func (r *rootRequire) hasModule(name string) *moduleDef {
 }
 
 func (r *rootRequire) init() {
-	if r.builtins == nil {
-		r.builtins = make(map[string]*moduleDef)
-	} else {
+	if r.initDone {
 		return
 	}
+	r.builtins = make(map[string]*moduleDef)
 	r.dangerous = make(map[string]struct{})
 	r.modules = make(map[string]*moduleDef)
 	r.restricted = make(map[string]struct{})
+	r.initDone = true
 }
 
 func (r *rootRequire) saveModule(name string, md *moduleDef) {
+	r.init()
 	r.modules[name] = md
 }
