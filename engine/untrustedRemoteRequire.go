@@ -21,6 +21,8 @@ type (
 )
 
 func (r *untrustedRemoteRequire) require(name string) goja.Value {
+	// TODO: currently, it is impossible to use builtin modules from untrusted sources
+	// relax this restriction so `some` builtin modules can be loaded.
 	target, err := url.Parse(name)
 	if err != nil {
 		panic(r.root.e.runtime.NewGoError(fmt.Errorf("module %v cannot be parsed as a valid module path", name)))
