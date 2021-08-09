@@ -72,3 +72,47 @@ func TestModuleIsNotRestricted(t *testing.T) {
 		t.Fatalf("After removing restriction, module should be loadable! But got %v", err)
 	}
 }
+
+func TestCanRequireLocalFiles(t *testing.T) {
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	err = e.AnchorModules("./testdata/imports")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = e.InteractiveEval(`
+		let mymod = require("mymod.js");
+		if (mymod.blah != "123") { throw new Error("mymod is incorrect");}
+		if (mymod.sibling.blah != "123") { throw new Error("sibling is incorrect");}
+		if (mymod.grandchildren.blah != "123") { throw new Error("grandchildren is incorrect");}
+		if (mymod.grandchildren.parent.blah != "123") { throw new Error("parent is incorrect");}
+	`)
+	if err != nil {
+		t.Fatalf("Should load mymod.js without any problems, but got %v", err)
+	}
+}
+
+func TestLocalModulesAreAnchored(t *testing.T) {
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	err = e.AnchorModules("./testdata/imports")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = e.InteractiveEval(`
+		let mymod = require("checkForLeaks.js");
+	`)
+	if err == nil {
+		t.Fatal("Containement leak!")
+	}
+}

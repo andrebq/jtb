@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 
 	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
@@ -11,6 +12,7 @@ import (
 	"github.com/andrebq/jtb/internal/modules/stdio"
 	"github.com/dop251/goja"
 	"github.com/rs/zerolog"
+	"github.com/spf13/afero"
 )
 
 const (
@@ -21,6 +23,8 @@ type (
 	// E contains the engine used to run all javascript code
 	E struct {
 		runtime *goja.Runtime
+
+		fs afero.Fs
 
 		stdin  io.Reader
 		stderr io.Writer
@@ -63,7 +67,11 @@ func New() (*E, error) {
 	if err != nil {
 		return nil, err
 	}
-	rr := &rootRequire{e: e}
+	base, err := filepath.Abs(".")
+	if err != nil {
+		return nil, err
+	}
+	rr := &rootRequire{e: e, anchor: base}
 	e.require = rr
 	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
 	rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
@@ -78,6 +86,10 @@ func New() (*E, error) {
 	rr.markAsDangerous("@rawexec")
 	rr.markAsRestricted("@rawexec", true)
 	err = e.registerGlobal("require", rr)
+	err = e.AnchorModules(".")
+	if err != nil {
+		return nil, err
+	}
 	return e, nil
 }
 
@@ -110,6 +122,16 @@ func (e *E) SetStderr(buf io.Writer) error {
 
 func (e *E) Close() error {
 	return e.closeAll(e.stdin, e.stdout, e.stderr)
+}
+
+func (e *E) AnchorModules(path string) error {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	e.require.anchor = abs
+	e.require.e.fs = OpenOSFilesystem(abs)
+	return nil
 }
 
 func (e *E) closeAll(objs ...interface{}) error {
