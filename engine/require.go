@@ -65,6 +65,8 @@ func (r *rootRequire) require(call goja.FunctionCall) goja.Value {
 		return r.requireBuiltin(name)
 	case r.isLocal(name):
 		return r.requireLocal(name)
+	case r.isRemote(name):
+		return r.requireRemote(name)
 	default:
 		panic(r.e.runtime.NewGoError(fmt.Errorf("Path %v is not understood as a valid module path", name)))
 	}
@@ -81,6 +83,10 @@ func (r *rootRequire) requireBuiltin(name string) goja.Value {
 func (r *rootRequire) requireLocal(name string) goja.Value {
 	fr := &trustedFileRequire{root: r, dir: ""}
 	return fr.require(name)
+}
+
+func (r *rootRequire) requireRemote(name string) goja.Value {
+	panic(r.e.runtime.NewGoError(errors.New("Remote modules are not supported right now!")))
 }
 
 func (r *rootRequire) markAsDangerous(name string) {
@@ -132,6 +138,13 @@ func (r *rootRequire) isLocal(name string) bool {
 	return u.Scheme == "" && path.Ext(path.Clean(u.Path)) == ".js"
 }
 
+func (r *rootRequire) isRemote(name string) bool {
+	u, err := url.Parse(name)
+	if err != nil {
+		return false
+	}
+	return u.Scheme != "" && path.Ext(path.Clean(u.Path)) == ".js"
+}
 func (r *rootRequire) hasModule(name string) *moduleDef {
 	if r.isBuiltin(name) {
 		return r.builtins[name]

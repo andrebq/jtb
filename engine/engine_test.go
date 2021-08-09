@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -114,5 +115,25 @@ func TestLocalModulesAreAnchored(t *testing.T) {
 	`)
 	if err == nil {
 		t.Fatal("Containement leak!")
+	}
+}
+
+func TestRemoteModules(t *testing.T) {
+	e, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+
+	err = e.AnchorModules("./testdata/imports")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = e.InteractiveEval(fmt.Sprintf(`
+		let mymod = require("%v");
+	`, "http://localhost:1234/mods/mymod.js"))
+	if err != nil {
+		t.Fatalf("Should load mymod.js without any problems, but got %v", err)
 	}
 }
