@@ -1,7 +1,7 @@
 .PHONY: test watch tidy
 
 test:
-	go test ./...
+	go test -timeout 300ms ./...
 
 watch:
 	modd
