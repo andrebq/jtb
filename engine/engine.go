@@ -73,13 +73,22 @@ func New() (*E, error) {
 	}
 	rr := &rootRequire{e: e, anchor: base}
 	e.require = rr
-	rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
-	rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
+	{
+		// ONLY SAFE MODULES SHOULD BE LISTED HERE
+		rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
+		rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
+		rr.markAsSafeForRemote(true, "@encoding/utf8", "@jtb")
+	}
+
+	// Although it might seem that @stdio is safe for remote
+	// this would allow a remote module to print arbitrary content
+	// in the stdout/stdin
 	rr.registerBuiltin("@stdio", &stdio.Module{
 		Stdout: func() io.Writer { return e.stdout },
 		Stderr: func() io.Writer { return e.stderr },
 		Stdin:  func() io.Reader { return e.stdin },
 	})
+
 	rr.registerBuiltin("@rawexec", &rawexec.Module{
 		Logger: e.logger.With().Str("module", "@rawexec").Logger(),
 	})
