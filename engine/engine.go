@@ -10,6 +10,7 @@ import (
 	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
 	"github.com/andrebq/jtb/internal/modules/rawexec"
 	"github.com/andrebq/jtb/internal/modules/stdio"
+	"github.com/andrebq/jtb/internal/modules/uuid"
 	"github.com/dop251/goja"
 	"github.com/rs/zerolog"
 	"github.com/spf13/afero"
@@ -75,23 +76,35 @@ func New() (*E, error) {
 	e.require = rr
 	{
 		// ONLY SAFE MODULES SHOULD BE LISTED HERE
-		rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion})
-		rr.registerBuiltin("@encoding/utf8", &utf8.Module{})
-		rr.markAsSafeForRemote(true, "@encoding/utf8", "@jtb")
+		if err := rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion}); err != nil {
+			return nil, err
+		}
+		if err := rr.registerBuiltin("@encoding/utf8", &utf8.Module{}); err != nil {
+			return nil, err
+		}
+		if err := rr.registerBuiltin("@uuid", &uuid.Module{}); err != nil {
+			return nil, err
+		}
+		rr.markAsSafeForRemote(true, "@encoding/utf8", "@jtb", "@uuid")
 	}
 
 	// Although it might seem that @stdio is safe for remote
 	// this would allow a remote module to print arbitrary content
 	// in the stdout/stdin
-	rr.registerBuiltin("@stdio", &stdio.Module{
+	if err := rr.registerBuiltin("@stdio", &stdio.Module{
 		Stdout: func() io.Writer { return e.stdout },
 		Stderr: func() io.Writer { return e.stderr },
 		Stdin:  func() io.Reader { return e.stdin },
-	})
+	}); err != nil {
+		return nil, err
+	}
 
-	rr.registerBuiltin("@rawexec", &rawexec.Module{
+	if err := rr.registerBuiltin("@rawexec", &rawexec.Module{
 		Logger: e.logger.With().Str("module", "@rawexec").Logger(),
-	})
+	}); err != nil {
+		return nil, err
+	}
+
 	rr.markAsDangerous("@rawexec")
 	rr.markAsRestricted("@rawexec", true)
 	err = e.registerGlobal("require", rr)
