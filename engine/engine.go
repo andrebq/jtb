@@ -9,6 +9,7 @@ import (
 
 	"github.com/andrebq/jtb/internal/modules/encoding/utf8"
 	"github.com/andrebq/jtb/internal/modules/rawexec"
+	"github.com/andrebq/jtb/internal/modules/sleep"
 	"github.com/andrebq/jtb/internal/modules/stdio"
 	"github.com/andrebq/jtb/internal/modules/uuid"
 	"github.com/dop251/goja"
@@ -76,22 +77,21 @@ func New() (*E, error) {
 	e.require = rr
 	{
 		// ONLY SAFE MODULES SHOULD BE LISTED HERE
-		if err := rr.registerBuiltin("@jtb", &jtbModule{version: jtbVersion}); err != nil {
+		if err := e.AddRemoteBuiltin("@jtb", &jtbModule{version: jtbVersion}); err != nil {
 			return nil, err
 		}
-		if err := rr.registerBuiltin("@encoding/utf8", &utf8.Module{}); err != nil {
+		if err := e.AddRemoteBuiltin("@encoding/utf8", &utf8.Module{}); err != nil {
 			return nil, err
 		}
-		if err := rr.registerBuiltin("@uuid", &uuid.Module{}); err != nil {
+		if err := e.AddRemoteBuiltin("@uuid", &uuid.Module{}); err != nil {
 			return nil, err
 		}
-		rr.markAsSafeForRemote(true, "@encoding/utf8", "@jtb", "@uuid")
 	}
 
 	// Although it might seem that @stdio is safe for remote
 	// this would allow a remote module to print arbitrary content
 	// in the stdout/stdin
-	if err := rr.registerBuiltin("@stdio", &stdio.Module{
+	if err := e.AddBuiltin("@stdio", false, &stdio.Module{
 		Stdout: func() io.Writer { return e.stdout },
 		Stderr: func() io.Writer { return e.stderr },
 		Stdin:  func() io.Reader { return e.stdin },
@@ -99,14 +99,16 @@ func New() (*E, error) {
 		return nil, err
 	}
 
-	if err := rr.registerBuiltin("@rawexec", &rawexec.Module{
+	if err := e.AddBuiltin("@sleep", false, &sleep.Module{}); err != nil {
+		return nil, err
+	}
+
+	if err := e.AddBuiltin("@rawexec", true, &rawexec.Module{
 		Logger: e.logger.With().Str("module", "@rawexec").Logger(),
 	}); err != nil {
 		return nil, err
 	}
 
-	rr.markAsDangerous("@rawexec")
-	rr.markAsRestricted("@rawexec", true)
 	err = e.registerGlobal("require", rr)
 	err = e.AnchorModules(".")
 	if err != nil {
@@ -115,11 +117,53 @@ func New() (*E, error) {
 	return e, nil
 }
 
+// ConnectStdio changes the std in/out/err streams from the default descard ones
+// to ones that connect to the given ones.
+//
+// If an entry is nil, the one already configured in the engine is kept
+func (e *E) ConnectStdio(in io.Reader, out, err io.Writer) {
+	e.stdin = in
+	e.stdout = out
+	e.stderr = err
+}
+
+// AddBuiltin module, if the module is marked as sensitve, the module will be marked as
+// dangerous and restrict (users need to call Unrestrict to enable the module for local/trusted scripts).
+//
+// If senstive is false, the module will be available for local/trusted scripts right after this function
+// returns.
+//
+// To add a module for remote use, call AddRemoteBuiltin.
+func (e *E) AddBuiltin(name string, sensitive bool, module moduleDefiner) error {
+	if err := e.require.canRegisterBuiltin(name); err != nil {
+		return err
+	}
+	if err := e.require.registerBuiltin(name, module); err != nil {
+		return err
+	}
+	if sensitive {
+		e.require.markAsDangerous(name)
+	}
+	return nil
+}
+
+// AddRemoteBuiltin adds the given module and exposes it to all scripts (local/trusted/remote)
+//
+// Be careful with which types of modules are defined for remote scripts as there won't be any
+// restrictions on what functions a remote script can make.
+func (e *E) AddRemoteBuiltin(name string, module moduleDefiner) error {
+	if err := e.require.canRegisterBuiltin(name); err != nil {
+		return err
+	}
+	if err := e.require.registerBuiltin(name, module); err != nil {
+		return err
+	}
+	e.require.markAsSafeForRemote(true, name)
+	return nil
+}
+
 // Unrestrict the given module and allows access to it from local sources or
 // other trusted sources.
-//
-// Untrusted source are not affected and will never be able to access restricted
-// modules.
 func (e *E) Unrestrict(name string) {
 	e.require.markAsRestricted(name, false)
 }

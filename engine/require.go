@@ -106,10 +106,9 @@ func (r *rootRequire) requireRemote(name string) goja.Value {
 }
 
 func (r *rootRequire) markAsDangerous(name string) {
-	if r.dangerous == nil {
-		r.dangerous = make(map[string]struct{})
-	}
+	r.init()
 	r.dangerous[name] = struct{}{}
+	r.restricted[name] = struct{}{}
 }
 
 func (r *rootRequire) isAllowedForRemote(name string) bool {
@@ -211,4 +210,15 @@ func (r *rootRequire) init() {
 func (r *rootRequire) saveModule(name string, md *moduleDef) {
 	r.init()
 	r.modules[name] = md
+}
+
+func (e *rootRequire) canRegisterBuiltin(name string) error {
+	if !strings.HasPrefix(name, "@") {
+		return errors.New("builtin modules must start with @")
+	}
+	e.init()
+	if m := e.hasModule(name); m != nil {
+		return fmt.Errorf("module %v already registered", name)
+	}
+	return nil
 }
