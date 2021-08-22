@@ -23,8 +23,8 @@ func TestBasicRuntime(t *testing.T) {
 		t.Fatalf("Unable to run code: %v", err)
 	}
 
-	if string(stderrBuf.String()) != `"hello world"` {
-		t.Fatalf("Stderr is invalid: %v", string(stderrBuf.String()))
+	if string(stderrBuf.String()) != "\"hello world\"\n" {
+		t.Fatalf("Stderr is invalid: %q", string(stderrBuf.String()))
 	}
 
 	_ = e

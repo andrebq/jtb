@@ -154,7 +154,6 @@ func (r *untrustedRemoteRequire) downloadCode(origin *url.URL) ([]byte, error) {
 }
 
 func (r *untrustedRemoteRequire) sameOrigin(other *url.URL) bool {
-	println(fmt.Sprintf("r.origin: %v / other.origin: %v", r.origin, other))
 	if r.origin == nil {
 		return false
 	}

@@ -41,6 +41,7 @@ func (c *console) info(call goja.FunctionCall) goja.Value {
 		}
 		buf.Write(jsonBytes)
 	}
+	buf.WriteRune('\n')
 	_, err := io.Copy(c.e.stderr, buf)
 	if err != nil {
 		errID := c.e.logError("console.info", err)
